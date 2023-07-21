@@ -1,7 +1,12 @@
 # frozen_string_literal: true
 
 require_relative 'program_env'
+require 'readline'
 
-prog = ProgramEnv.new 'puts(ls -al)'
+loop do
+  user_input = Readline.readline('> ')
+  break if user_input.nil? || user_input == 'exit'
 
-prog.lapis_eval
+  Readline::HISTORY.push(user_input)
+  puts (ProgramEnv.new user_input).lapis_eval
+end

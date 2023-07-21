@@ -33,12 +33,16 @@ class ProgramEnv
   end
 
   def tokens(str)
-    str.split.map { |s| s.split(';') }
-       .flatten
-       .map { |s| s.split('(') }
-       .flatten
-       .map { |s| s.split(')') }
-       .flatten
+    str
+      .split
+      .map do |s|
+      if s[-1] == ','
+        [s[0...s.size - 1], ',']
+      else
+        s
+      end
+    end
+      .flatten
   end
 
   def rewrite(tks)
