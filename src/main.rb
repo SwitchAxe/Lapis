@@ -8,5 +8,10 @@ loop do
   break if user_input.nil? || user_input == 'exit'
 
   Readline::HISTORY.push(user_input)
-  puts (ProgramEnv.new user_input).lapis_eval
+  out = (ProgramEnv.new user_input).lapis_eval
+  if out.is_a? ProgramOutput
+    puts out.output
+  else
+    puts out
+  end
 end

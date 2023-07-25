@@ -8,9 +8,60 @@ def in_path?(str)
   $CHILD_STATUS.success?
 end
 
+# pipe implementation
+def pipe(input, *proc2)
+  # We use the fact that 'spawn' doesn't use a shell when
+  # arguments are provided.
+  r, w = IO.pipe
+  w.write(input)
+  r2, w2 = IO.pipe
+  spawn(*proc2, in: r, out: w2)
+  w.close
+  r.close
+  w2.close
+  res = r2.readlines.inject('', &:+)
+  r2.close
+  res
+end
+
+# Program output to pipe into other processes using
+# method chaining
+class ProgramOutput
+  def initialize(out)
+    @out = out
+  end
+
+  def method_missing(method_name, *args, &block)
+    block&.call
+    unless @out.respond_to?(method_name)
+      return ProgramOutput.new(pipe(@out, method_name.to_s,
+                                    *args.map(&:to_s)))
+    end
+
+    @out.method_name(*args, block)
+  end
+
+  def respond_to_missing?(_any, *)
+    true
+  end
+
+  def output = @out
+end
+
+def lapis_call_ext(pname, *pargs)
+  s = ''
+  raise "Unknown Executable #{pname}" unless in_path?(pname)
+
+  argstr = pargs[0].inject('') { |a, c| "#{a} #{c}" }
+  exect = pname.to_s + argstr
+  IO.popen(exect, err: %i[child out]) { |ex| s += ex.read }
+  ProgramOutput.new(s)
+end
+
 # The environment in which the shell execution takes place
 class ProgramEnv
-  def method_missing(method_name, *args)
+  def method_missing(method_name, *args, &block)
+    block&.call
     lapis_call_ext(method_name, args)
   end
 
@@ -18,46 +69,56 @@ class ProgramEnv
     true
   end
 
-  def lapis_call_ext(pname, *pargs)
-    s = ''
-    raise "Unknown Executable #{pname}" unless in_path?(pname)
-
-    argstr = pargs[0].inject('') { |a, c| "#{a} #{c}" }
-    exect = pname.to_s + argstr
-    IO.popen(exect, err: %i[child out]) { |ex| s += ex.read }
-    s
-  end
-
   def initialize(str)
     @str = str
   end
 
   def tokens(str)
-    str
-      .split
-      .map do |s|
-      if s[-1] == ','
-        [s[0...s.size - 1], ',']
+    tks = []
+    tmp = ''
+    special = ['(', ')', '{', '}', ',', '.', ' ']
+    str.chars do |c|
+      if special.include? c
+        tks << tmp unless tmp.empty?
+        tks << c
+        tmp = ''
       else
-        s
+        tmp += c
       end
     end
-      .flatten
+    tks << tmp unless tmp.empty?
+    tks
+  end
+
+  def maybe_quote(str)
+    if str[0] == "'"
+      str
+    else
+      "'#{str}'"
+    end
   end
 
   def rewrite(tks)
-    tks.map do |s|
-      if s[0] == '-'
-        # most likely a program argument
-        "'#{s}'"
+    special = [')', '{', '}', '.', ' ']
+    must_insert_comma = false
+    tks
+      .filter { |s| s != ' ' }
+      .map do |s|
+      if special.include? s
+        must_insert_comma = false
+        s
+      elsif must_insert_comma && !['(', ','].include?(s)
+        " #{maybe_quote(s)},"
       else
+        must_insert_comma = true
         s
       end
     end
   end
 
   def reconcat(tks)
-    tks.inject('') { |s, a| "#{s} #{a}" }
+    tks[-1] = tks[-1][0..-2] if tks[-1][-1] == ','
+    tks.inject('', &:+)
   end
 
   def lapis_eval
