@@ -7,6 +7,30 @@ def in_path?(str)
   `which #{str}`
   $CHILD_STATUS.success?
 end
+# global array of operators AND keywords in the
+# ruby language. DO NOT MODIFY THIS!!!!!
+$special = [')', '{', '}', '.',
+            ' ', '+', '-', '/',
+            '*', '**', '%', '>>',
+            '<<', '&', '|', '~',
+            '&&', '||', '?', ':',
+            '^', '!', '<', '<=',
+            '>', '>=', '==', '===',
+            '!=', '=~', '!~', '<=>',
+            '..', '...', 'rescue', '=',
+            '**=', '*=', '/=', '%=',
+            '+=', '-=', '<<=', '>>=',
+            '&&=', '&=', '||=', '|=',
+            '^=', 'defined?', 'not', 'and',
+            'or', 'if', 'else', 'elsif',
+            'while', 'until', 'for', 'in',
+            'begin', 'end', 'BEGIN', 'END',
+            'alias', 'break', 'case', 'class',
+            'def', 'do', 'ensure', 'module',
+            'next', 'nil', 'redo', 'retry',
+            'return', 'self', 'super', 'then',
+            'undef', 'when', 'yield', 'ENCODING',
+            'LINE', 'FILE']
 
 # pipe implementation
 def pipe(input, *proc2)
@@ -32,12 +56,13 @@ class ProgramOutput
   end
 
   def method_missing(method_name, *args, &block)
-    block&.call
     unless @out.respond_to?(method_name)
-      return ProgramOutput.new(pipe(@out, method_name.to_s,
+      ret = ProgramOutput.new(pipe(@out, method_name.to_s,
                                     *args.map(&:to_s)))
+      block&.call(ret)
+      return ret
     end
-
+    block&.call
     @out.method_name(*args, block)
   end
 
@@ -51,7 +76,7 @@ end
 def lapis_call_ext(pname, *pargs)
   s = ''
   raise "Unknown Executable #{pname}" unless in_path?(pname)
-
+  
   argstr = pargs[0].inject('') { |a, c| "#{a} #{c}" }
   exect = pname.to_s + argstr
   IO.popen(exect, err: %i[child out]) { |ex| s += ex.read }
@@ -76,9 +101,8 @@ class ProgramEnv
   def tokens(str)
     tks = []
     tmp = ''
-    special = ['(', ')', '{', '}', ',', '.', ' ']
     str.chars do |c|
-      if special.include? c
+      if $special.include? c
         tks << tmp unless tmp.empty?
         tks << c
         tmp = ''
@@ -99,12 +123,11 @@ class ProgramEnv
   end
 
   def rewrite(tks)
-    special = [')', '{', '}', '.', ' ']
     must_insert_comma = false
     tks
       .filter { |s| s != ' ' }
       .map do |s|
-      if special.include? s
+      if $special.include? s
         must_insert_comma = false
         s
       elsif must_insert_comma && !['(', ','].include?(s)
@@ -117,6 +140,7 @@ class ProgramEnv
   end
 
   def reconcat(tks)
+    return "" if tks.size == 0
     tks[-1] = tks[-1][0..-2] if tks[-1][-1] == ','
     tks.inject('', &:+)
   end
