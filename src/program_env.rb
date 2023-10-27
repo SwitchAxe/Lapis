@@ -9,7 +9,7 @@ def in_path?(str)
 end
 # global array of operators AND keywords in the
 # ruby language. DO NOT MODIFY THIS!!!!!
-$special = [')', '{', '}', '.',
+$special = ['(', ')', '{', '}',
             ' ', '+', '-', '/',
             '*', '**', '%', '>>',
             '<<', '&', '|', '~',
@@ -30,7 +30,8 @@ $special = [')', '{', '}', '.',
             'next', 'nil', 'redo', 'retry',
             'return', 'self', 'super', 'then',
             'undef', 'when', 'yield', 'ENCODING',
-            'LINE', 'FILE']
+            'LINE', 'FILE', '#', '.',
+            ';']
 
 # pipe implementation
 def pipe(input, *proc2)
@@ -58,12 +59,18 @@ class ProgramOutput
   def method_missing(method_name, *args, &block)
     unless @out.respond_to?(method_name)
       ret = ProgramOutput.new(pipe(@out, method_name.to_s,
-                                    *args.map(&:to_s)))
-      block&.call(ret)
+                                   *args.map(&:to_s)))
+      maybe_blr = block&.call(ret)
+      # if maybe_blr (blr == block return) is nil, return ret.
+      # otherwise, return maybe_blr.
+      return maybe_blr if maybe_blr
       return ret
     end
-    block&.call
-    @out.method_name(*args, block)
+    met = @out.method(method_name)
+    res = met.call(*args)
+    ret = block&.call(res)
+    return ret if ret
+    res
   end
 
   def respond_to_missing?(_any, *)
@@ -86,8 +93,10 @@ end
 # The environment in which the shell execution takes place
 class ProgramEnv
   def method_missing(method_name, *args, &block)
-    block&.call
-    lapis_call_ext(method_name, args)
+    a = lapis_call_ext(method_name, args)
+    b = block&.call(a.output)
+    return b if b
+    a
   end
 
   def respond_to_missing?(_method_name, *)
@@ -101,11 +110,19 @@ class ProgramEnv
   def tokens(str)
     tks = []
     tmp = ''
+    in_str = false
     str.chars do |c|
-      if $special.include? c
+      if $special.include?(c) and !in_str
         tks << tmp unless tmp.empty?
         tks << c
         tmp = ''
+      elsif c == '"'
+        tmp += '"'
+        in_str = !in_str
+        begin
+          tks << tmp
+          tmp = ''
+        end if in_str == false 
       else
         tmp += c
       end
@@ -125,12 +142,12 @@ class ProgramEnv
   def rewrite(tks)
     must_insert_comma = false
     tks
-      .filter { |s| s != ' ' }
+      .filter { |s| s != '' }
       .map do |s|
-      if $special.include? s
+      if $special.include?(s) || (s[0] == '"')
         must_insert_comma = false
         s
-      elsif must_insert_comma && !['(', ','].include?(s)
+      elsif must_insert_comma && !$specials.include?(s)
         " #{maybe_quote(s)},"
       else
         must_insert_comma = true
