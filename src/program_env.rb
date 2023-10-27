@@ -139,21 +139,37 @@ class ProgramEnv
     end
   end
 
+  # some predicates for rewriting the Lapis sentence...
+  def insert_comma?(s)
+    if $special.include?(s) || (s[0] == '"')
+      return true
+    end
+    false
+  end
+
+  def quote?(s, _b)
+    # _b is a variable declared in the
+    # following function.
+    if _b && !$special.include?(s)
+      return true
+    end
+    false
+  end
+
+  # function to map s and _b to a boolean as a result of
+  # one of te procedures defined above.
+
+  def dispatch(s, _b)
+    return [s, false] unless insert_comma?(s)
+    return ["#{maybe_quote(s)}", _b] if quote?(s, _b)
+    [s, true]
+  end
+  
   def rewrite(tks)
-    must_insert_comma = false
+    comma = false
     tks
       .filter { |s| s != '' }
-      .map do |s|
-      if $special.include?(s) || (s[0] == '"')
-        must_insert_comma = false
-        s
-      elsif must_insert_comma && !$specials.include?(s)
-        " #{maybe_quote(s)},"
-      else
-        must_insert_comma = true
-        s
-      end
-    end
+      .map {|s| p = dispatch(s, comma); comma = p[1]; s}
   end
 
   def reconcat(tks)
