@@ -105,8 +105,14 @@ class ProgramEnv
 
   def initialize(str)
     @str = str
+    @vars = {} # an hashmap
+    @result = ""
   end
 
+  def get_input(str)
+    @str = str
+  end
+  
   def tokens(str)
     tks = []
     tmp = ''
@@ -175,10 +181,32 @@ class ProgramEnv
   def reconcat(tks)
     return "" if tks.size == 0
     tks[-1] = tks[-1][0..-2] if tks[-1][-1] == ','
-    tks.inject('', &:+)
+    tks
+      .map {|s| if @vars.has_key?(s) then "@vars[\"#{s}\"]" else s end }
+      .inject('', &:+)
   end
 
-  def lapis_eval
-    instance_eval(reconcat(rewrite(tokens(@str))))
+  def assignment?(str)
+    /[[:alnum:]]+[[:space:]]*=[[:space:]]*.*/.match(str) != nil
   end
+
+  def get_assignment(str)
+    tks = tokens(str)
+    id = tks[0]
+    while (tks[0] != "=") do tks.shift() end
+    tks.shift()
+    val = instance_eval(reconcat(rewrite(tks)))
+    @vars[id] = val
+  end
+  
+  def lapis_eval
+    if assignment? @str then
+      get_assignment(@str)
+      @result = nil
+    else
+      @result = instance_eval(reconcat(rewrite(tokens(@str))))
+    end
+  end
+  def result = @result
+  
 end
