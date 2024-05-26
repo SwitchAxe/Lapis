@@ -34,10 +34,9 @@ loop do
     else
       puts out.result
     end
-  rescue
-    tmp = File.open(history_file, File::APPEND | File::WRONLY) do |fd|
-      fd.write(new_history.inject("") {|s, r|  s + "\n" + r})
-    end
+  rescue => ex
+    puts "Exception:"
+    puts ex.full_message(highlight: true, order: :top)
   end
 end
 

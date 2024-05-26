@@ -78,7 +78,9 @@ class Keypress
   
   def resize_limit(n) @right_lim = n end
   def set(str)
-    if str == "\r" then # newline
+    if str == "\t" then
+      @in = nil
+    elsif str == "\r" then # newline
       @in = nil
       @p = 0
     elsif str == "\e[D" then # left
@@ -125,7 +127,6 @@ class Editor
     @history_index = 0
     @must_return = false
     @key = Keypress.new
-    @special_keys = ["\t", nil]
     @ttyreader.on(:keybackspace) do
       pos = @key.getp
       @input.slice!(pos - 1)
@@ -141,9 +142,9 @@ class Editor
         print $ttycursor.scroll_down
         print $ttycursor.row(0)
         print $ttycursor.column(0)
-        print $ttypastel.red "\nNo completions available!"
+        print $ttycursor.clear_line
+        print $ttypastel.red "No completions available!\n"
         print $ttycursor.restore
-        print $ttycursor.backward(1)
         STDOUT.flush
       else
         for i in 1..@last_word.length do
@@ -155,8 +156,6 @@ class Editor
         print $ttycursor.column(0)
         print $ttycursor.clear_line
         print @user_prompt + Colorize.new(@input).get
-        # STDOUT.flush
-        # print $ttycursor.clear_screen_down
         STDOUT.flush
       end
     end
@@ -170,12 +169,17 @@ class Editor
         print $ttycursor.column(0)
         print $ttypastel.red "\nEnd of history!"
         print $ttycursor.restore
-        print $ttycursor.backward(1)
         STDOUT.flush
       else
         @input_bak = @input if @history_index == 0
         @input = @history[@history_index]
         @history_index += 1
+        print $ttycursor.save
+        print $ttycursor.clear_line
+        print $ttycursor.column(0)
+        print @user_prompt + Colorize.new(@input).get
+        print $ttycursor.restore
+        STDOUT.flush
       end
     end
 
@@ -187,7 +191,6 @@ class Editor
         print $ttycursor.column(0)
         print $ttypastel.red "\nEnd of history!"
         print $ttycursor.restore
-        print $ttycursor.backward(1)
         STDOUT.flush
       elsif @history_index == 1 then
         @history_index = 0
@@ -218,8 +221,8 @@ class Editor
       print $ttycursor.clear_line
       print $ttycursor.column(0)
       STDOUT.flush
-      @input.insert(@key.getp - 1, k) if not @special_keys.include? k
-      @last_word += k if not @special_keys.include? k
+      @input.insert(@key.getp - 1, k) if k != nil
+      @last_word += k if k != nil
       if k == ' ' then @last_word = "" end
       print @user_prompt + Colorize.new(@input).get
       print $ttycursor.restore
