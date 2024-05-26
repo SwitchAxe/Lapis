@@ -30,6 +30,16 @@ end
 
 prompt
 ```
+
+## How to run the shell
+provided you have the dependencies (the latest ruby version and bundler) you can run
+the shell in two ways:
+- (Recommended) use the startup script provided with the shell.
+  - The instructions on how to use it can be found in the script itself.
+- (Not recommended) just run `ruby src/main.rb` while in the project root dir.
+  - This has the problem that you MUST be in the project root directory for it to work.
+  - It will set the working directory to the project dir. If that's undesirable to you,
+	use the first (preferred) option with the launch script.
   
 # Warning
 ⚠️ **Some components of the parser might break unpredictably. Use at your own risk for now.**
