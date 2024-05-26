@@ -41,5 +41,5 @@ loop do
 end
 
 tmp = File.open(history_file, File::APPEND | File::WRONLY) do |fd|
-  fd.write(new_history.inject("") {|s, r|  s + "\n" + r})
+  fd.write(new_history.map {|s| s + "\n"}.inject("", &:+))
 end

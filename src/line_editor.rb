@@ -167,7 +167,8 @@ class Editor
         print $ttycursor.scroll_down
         print $ttycursor.row(0)
         print $ttycursor.column(0)
-        print $ttypastel.red "\nEnd of history!"
+        print $ttycursor.clear_line
+        print $ttypastel.red "End of history!\n"
         print $ttycursor.restore
         STDOUT.flush
       else
@@ -189,7 +190,8 @@ class Editor
         print $ttycursor.scroll_down
         print $ttycursor.row(0)
         print $ttycursor.column(0)
-        print $ttypastel.red "\nEnd of history!"
+        print $ttycursor.clear_line
+        print $ttypastel.red "End of history!\n"
         print $ttycursor.restore
         STDOUT.flush
       elsif @history_index == 1 then
