@@ -13,8 +13,23 @@ It's designed to be feature-complete and with a syntax compatible with the defau
   * [x] Blocks as arguments to programs
 
 - [ ] Other/Wishlist
-  * [ ] A config file to store the prompt configuration
+  * [x] A config file to store the prompt configuration
   * [ ] A way to extend or customize the line editor
+  
+## An example config file
+Put this in  `/home/youruser/.config/lapis/config.rb` to get started.
+```ruby
+# this function is mandatory. you can optionally use any functions to aid in
+# building this one, which MUST be present.
+# this is just a prompt example, you can build it however  you want.
+def prompt ()
+  user = ENV['USER']
+  host = ENV['HOSTNAME']
+  "#{user}@#{host} => "
+end
+
+prompt
+```
   
 # Warning
 ⚠️ **Some components of the parser might break unpredictably. Use at your own risk for now.**
