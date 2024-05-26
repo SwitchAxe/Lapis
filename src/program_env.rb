@@ -2,11 +2,32 @@
 
 require 'English'
 require 'ripper'
+require 'pp'
 
-def in_path?(str)
-  `which #{str}`
-  $CHILD_STATUS.success?
+def in_path?(cmd)
+  exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+  ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+    exts.each do |ext|
+      exe = File.join(path, "#{cmd}#{ext}")
+      return exe if File.executable?(exe) && !File.directory?(exe)
+    end
+  end
+  nil
 end
+
+def to_integer(string)
+  num = string.to_i
+  return num if num.to_s == string
+  nil
+end
+
+def strlit?(str)
+    if (str[0] == '"') and (str[str.length() - 1] == '"') then
+      return true
+  end
+  false
+end
+  
 # global array of operators AND keywords in the
 # ruby language. DO NOT MODIFY THIS!!!!!
 $special = ['(', ')', '{', '}',
@@ -90,6 +111,97 @@ def lapis_call_ext(pname, *pargs)
   ProgramOutput.new(s)
 end
 
+
+class Tokens
+  def initialize(str)
+    @str = str
+    @tks = []
+    tmp = ''
+    in_str = false
+    @str.chars do |c|
+      if c == "-"
+        tmp += "-"
+        
+      elsif $special.include?(c) and !in_str
+        @tks << tmp unless tmp.empty?
+        @tks << c
+        tmp = ''
+      elsif c == '"'
+        tmp += '"'
+        in_str = !in_str
+        begin
+          @tks << tmp
+          tmp = ''
+        end if in_str == false 
+      else
+        tmp += c
+      end
+    end
+    @tks << tmp unless tmp.empty?
+  end
+  
+  def get = @tks
+end
+
+class Format
+  def initialize(tks, vars)
+    @tks = tks
+    @result = ""
+    @vars = vars
+    rewrite
+    reconcat
+  end
+
+  def rewrite()
+    last_word = ""
+    last_word_quoted = false
+    last_word_command = false
+    @tks = @tks.map.with_index do |x, i|
+      if (x == ' ') then x
+      elsif i == 0 then
+        last_word = x;
+        last_word_command = true if in_path?(x)
+        x
+      elsif in_path?(last_word) || ProgramEnv.method_defined?(last_word) then
+        if $special.include? x then
+          last_word = x
+          x
+        elsif strlit? x then x
+        elsif (!@vars.has_key?(x)) || x[0] == "-" then
+          last_word = "'#{x}'"
+          last_word_quoted = true
+          "'#{x}'"
+        end
+      elsif (!in_path?(x)) && (!ProgramEnv.method_defined?(x)) then
+        if x[0] == "-" || !@vars.has_key?(x) then
+          if ($special.include? last_word) || ($special.include? x) then
+            last_word = x
+            x
+          else
+            last_word = x
+            last_word_quoted = true
+            ", '#{x}'"
+          end
+        end
+      else
+        last_word = x
+        last_word_quoted = false
+        last_word_command = true if in_path? x
+        x
+      end
+    end
+  end
+  
+  def reconcat()
+    return "" if @tks.size == 0
+    @tks[-1] = @tks[-1][0..-2] if @tks[-1][-1] == ','
+    @result = @tks
+                .map {|s| if @vars.has_key?(s) then "@vars[\"#{s}\"]" else s end }
+                .inject('', &:+)
+  end
+  def get = @result
+end
+
 # The environment in which the shell execution takes place
 class ProgramEnv
   def method_missing(method_name, *args, &block)
@@ -112,90 +224,19 @@ class ProgramEnv
   def get_input(str)
     @str = str
   end
-  
-  def tokens(str)
-    tks = []
-    tmp = ''
-    in_str = false
-    str.chars do |c|
-      if $special.include?(c) and !in_str
-        tks << tmp unless tmp.empty?
-        tks << c
-        tmp = ''
-      elsif c == '"'
-        tmp += '"'
-        in_str = !in_str
-        begin
-          tks << tmp
-          tmp = ''
-        end if in_str == false 
-      else
-        tmp += c
-      end
-    end
-    tks << tmp unless tmp.empty?
-    tks
-  end
-
-  def maybe_quote(str)
-    if str[0] == "'"
-      str
-    else
-      "'#{str}'"
-    end
-  end
-
-  # some predicates for rewriting the Lapis sentence...
-  def insert_comma?(s)
-    if $special.include?(s) || (s[0] == '"')
-      return true
-    end
-    false
-  end
-
-  def quote?(s, _b)
-    # _b is a variable declared in the
-    # following function.
-    if _b && !$special.include?(s)
-      return true
-    end
-    false
-  end
-
-  # function to map s and _b to a boolean as a result of
-  # one of te procedures defined above.
-
-  def dispatch(s, _b)
-    return [s, false] unless insert_comma?(s)
-    return ["#{maybe_quote(s)}", _b] if quote?(s, _b)
-    [s, true]
-  end
-  
-  def rewrite(tks)
-    comma = false
-    tks
-      .filter { |s| s != '' }
-      .map {|s| p = dispatch(s, comma); comma = p[1]; s}
-  end
-
-  def reconcat(tks)
-    return "" if tks.size == 0
-    tks[-1] = tks[-1][0..-2] if tks[-1][-1] == ','
-    tks
-      .map {|s| if @vars.has_key?(s) then "@vars[\"#{s}\"]" else s end }
-      .inject('', &:+)
-  end
 
   def assignment?(str)
     /[[:alnum:]]+[[:space:]]*=[[:space:]]*.*/.match(str) != nil
   end
 
   def get_assignment(str)
-    tks = tokens(str)
+    tks = Tokens.new(str).get
     id = tks[0]
     while (tks[0] != "=") do tks.shift() end
     tks.shift()
-    val = instance_eval(reconcat(rewrite(tks)))
+    tks = Tokens.new(@str).get
+    fmt = Format.new(tks, @vars).get
+    val = instance_eval(fmt)
     @vars[id] = val
   end
   
@@ -204,9 +245,10 @@ class ProgramEnv
       get_assignment(@str)
       @result = nil
     else
-      @result = instance_eval(reconcat(rewrite(tokens(@str))))
+      tks = Tokens.new(@str).get
+      fmt = Format.new(tks, @vars).get
+      @result = instance_eval(fmt)
     end
   end
   def result = @result
-  
 end
