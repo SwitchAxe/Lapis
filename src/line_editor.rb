@@ -70,6 +70,7 @@ end
 class Keypress
   def initialize()
     @p = 0
+    @in = nil
     @right_lim = 0
   end
 
@@ -77,7 +78,10 @@ class Keypress
   
   def resize_limit(n) @right_lim = n end
   def set(str)
-    if str == "\e[D" then # left
+    if str == "\r" then # newline
+      @in = nil
+      @p = 0
+    elsif str == "\e[D" then # left
       if @p > 0 then
         print $ttycursor.backward(1)
         @in = nil
@@ -109,13 +113,16 @@ class Keypress
 end
 
 class Editor
-  def initialize(pr)
+  def initialize(pr, hist)
     @ttyreader = TTY::Reader.new
     @prompt = Prompt.new
     @user_prompt = pr
     @ttyreader.on(:keyctrlx) { exit }
     @input = ""
+    @input_bak = ""
     @last_word = ""
+    @history = hist
+    @history_index = 0
     @must_return = false
     @key = Keypress.new
     @special_keys = ["\t", nil]
@@ -153,11 +160,50 @@ class Editor
         STDOUT.flush
       end
     end
+
+    # history up
+    @ttyreader.on(:keyup) do
+      if @history_index >= @history.size then
+        print $ttycursor.save
+        print $ttycursor.scroll_down
+        print $ttycursor.row(0)
+        print $ttycursor.column(0)
+        print $ttypastel.red "\nEnd of history!"
+        print $ttycursor.restore
+        print $ttycursor.backward(1)
+        STDOUT.flush
+      else
+        @input_bak = @input if @history_index == 0
+        @input = @history[@history_index]
+        @history_index += 1
+      end
+    end
+
+    @ttyreader.on(:keydown) do
+      if @history_index == 0 then
+        print $ttycursor.save
+        print $ttycursor.scroll_down
+        print $ttycursor.row(0)
+        print $ttycursor.column(0)
+        print $ttypastel.red "\nEnd of history!"
+        print $ttycursor.restore
+        print $ttycursor.backward(1)
+        STDOUT.flush
+      elsif @history_index == 1 then
+        @history_index = 0
+        @input = @input_bak
+      else
+        @history_index -= 1
+        @input = @history[@history_index]
+      end
+    end
+    
     @ttyreader.on(:keyreturn, :keyenter) do
       print $ttycursor.down(1)
       print $ttycursor.column(0)
       STDOUT.flush
       @must_return = true
+      @history_index = 0
     end
   end
 
@@ -181,5 +227,4 @@ class Editor
     end
     return nil
   end
-  
 end
