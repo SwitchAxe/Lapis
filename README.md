@@ -13,4 +13,4 @@ It's designed to be feature-complete and with a syntax compatible with the defau
   * [x] Blocks as arguments to programs
 
 # Warning
-:warning **Some components of the parser might break unpredictably. Use at your own risk for now.**
+⚠️ **Some components of the parser might break unpredictably. Use at your own risk for now.**
