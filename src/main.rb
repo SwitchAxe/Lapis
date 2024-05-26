@@ -3,10 +3,19 @@ require 'readline'
 require_relative 'line_editor'
 out = ProgramEnv.new ""
 
+
 prompt = ""
 config_dir = ENV['HOME'] + "/.config/lapis/"
 config_file = config_dir + "config.rb"
 history_file = config_dir + ".history"
+
+# to find the user-defined functions in the default location
+# (that is, .config/lapis/procedures.rb)
+$LOAD_PATH << config_dir
+
+# and now let's require it.
+require "procedures.rb"
+
 if File.exist? config_file then
   prompt_env = ProgramEnv.new(File.read config_file)
   prompt_env.lapis_eval

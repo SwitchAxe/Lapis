@@ -127,15 +127,27 @@ class Tokens
     @tks = []
     tmp = ''
     in_str = false
-    @str.chars do |c|
+    @str.chars.each_with_index do |c, i|
       if c == "-"
         tmp += "-"
-        
-      elsif $special.include?(c) and !in_str
+      elsif c == " " and !in_str then
+        @tks << tmp unless tmp.empty?
+        @tks << " "
+        tmp = ""
+      elsif c == "/" and (!in_str) and (@str[i-1] == @str[i+1] &&
+                                        @str[i-1] == ' ') then
+        @tks << tmp unless tmp.empty?
+        @tks << c
+        tmp = ''
+      elsif $special.include?(c) and (!in_str) then
         @tks << tmp unless tmp.empty?
         @tks << c
         tmp = ''
       elsif c == '"'
+        begin
+          @tks << tmp
+          tmp = ""
+        end unless tmp.empty? or tmp[0] == "\""
         tmp += '"'
         in_str = !in_str
         begin
@@ -162,48 +174,42 @@ class Format
   end
 
   def rewrite()
-    last_word = ""
-    last_word_quoted = false
-    last_word_command = false
-    @tks = @tks.map.with_index do |x, i|
-      if (x == ' ') then x
+    past_first_arg = false
+    in_command = false
+    new_tks = []
+    @tks.each_with_index do |x, i|
+      if (x == ' ') then new_tks << x
       elsif i == 0 then
-        last_word = x;
-        last_word_command = true if in_path?(x)
-        x
-      elsif in_path?(last_word) || method?(last_word) then
-        if $special.include? x then
-          last_word = x
-          x
-        elsif strlit? x then x
-        elsif x[0] == "-" then
-          last_word = "'#{x}'"
-          last_word_quoted = true
-          "'#{x}'"
-        else
-          last_word = x
-          x
+        if in_path?(x) or method?(x) then
+          in_command = true
+          new_tks << x
+          new_tks << "("
+        else new_tks << x
         end
-      elsif (!in_path?(x)) && (!method?(x)) then
-        if x[0] == "-" then
-          if ($special.include? last_word) || ($special.include? x) then
-            last_word = x
-            x
-          else
-            last_word = ", '#{x}'"
-            last_word_quoted = true
-            last_word
-          end
-        else
-          last_word = x
-          x
+      elsif $special.include? x then
+        if in_command then
+          new_tks << ")"
+          new_tks << x
+          in_command = false
+          past_first_arg = false
+        else new_tks << x
         end
       else
-        last_word = x
-        last_word_quoted = false
-        last_word_command = true if in_path? x
-        x
+        if in_command then
+          if past_first_arg then
+            new_tks << ","
+            new_tks << x
+          else
+            past_first_arg = true if in_command
+            new_tks << x
+          end
+        else new_tks << x
+        end
       end
+    end
+    @tks = new_tks
+    if in_command and new_tks[-1][0] != ")" then
+      @tks << ")"
     end
   end
   
@@ -245,7 +251,6 @@ class ProgramEnv
   def assignment?(str)
     /[[:alnum:]]+[[:space:]]*=[[:space:]]*.*/.match(str).to_s == str
   end
-
   def get_assignment(str)
     tks = Tokens.new(str).get
     id = tks[0]
