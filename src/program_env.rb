@@ -219,6 +219,8 @@ end
 
 # The environment in which the shell execution takes place
 class ProgramEnv
+  require 'bundler/setup'
+  require 'pastel' # for the config file
   def method_missing(method_name, *args, &block)
     a = lapis_call_ext(method_name, args)
     b = block&.call(a.output)
@@ -241,7 +243,7 @@ class ProgramEnv
   end
 
   def assignment?(str)
-    /[[:alnum:]]+[[:space:]]*=[[:space:]]*.*/.match(str) != nil
+    /[[:alnum:]]+[[:space:]]*=[[:space:]]*.*/.match(str).to_s == str
   end
 
   def get_assignment(str)
