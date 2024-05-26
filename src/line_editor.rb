@@ -172,7 +172,7 @@ class Editor
       print $ttycursor.clear_line
       print $ttycursor.column(0)
       STDOUT.flush
-      @input += k if not @special_keys.include? k
+      @input.insert(@key.getp - 1, k) if not @special_keys.include? k
       @last_word += k if not @special_keys.include? k
       if k == ' ' then @last_word = "" end
       print @user_prompt + Colorize.new(@input).get

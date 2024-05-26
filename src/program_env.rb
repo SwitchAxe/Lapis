@@ -27,6 +27,15 @@ def strlit?(str)
   end
   false
 end
+
+def method?(str)
+  begin
+    method(str)
+    return true
+  rescue
+    return false
+  end
+end
   
 # global array of operators AND keywords in the
 # ruby language. DO NOT MODIFY THIS!!!!!
@@ -162,26 +171,32 @@ class Format
         last_word = x;
         last_word_command = true if in_path?(x)
         x
-      elsif in_path?(last_word) || ProgramEnv.method_defined?(last_word) then
+      elsif in_path?(last_word) || method?(last_word) then
         if $special.include? x then
           last_word = x
           x
         elsif strlit? x then x
-        elsif (!@vars.has_key?(x)) || x[0] == "-" then
+        elsif x[0] == "-" then
           last_word = "'#{x}'"
           last_word_quoted = true
           "'#{x}'"
+        else
+          last_word = x
+          x
         end
-      elsif (!in_path?(x)) && (!ProgramEnv.method_defined?(x)) then
-        if x[0] == "-" || !@vars.has_key?(x) then
+      elsif (!in_path?(x)) && (!method?(x)) then
+        if x[0] == "-" then
           if ($special.include? last_word) || ($special.include? x) then
             last_word = x
             x
           else
-            last_word = x
+            last_word = ", '#{x}'"
             last_word_quoted = true
-            ", '#{x}'"
+            last_word
           end
+        else
+          last_word = x
+          x
         end
       else
         last_word = x
