@@ -12,5 +12,9 @@ It's designed to be feature-complete and with a syntax compatible with the defau
   * [x] Ruby languge interoperability (mixing programs and functions, etc)
   * [x] Blocks as arguments to programs
 
+- [ ] Other/Wishlist
+  * [ ] A config file to store the prompt configuration
+  * [ ] A way to extend or customize the line editor
+  
 # Warning
 ⚠️ **Some components of the parser might break unpredictably. Use at your own risk for now.**
