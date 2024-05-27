@@ -269,7 +269,6 @@ class ProgramEnv
     else
       tks = Tokens.new(@str).get
       fmt = Format.new(tks, @vars).get
-      puts "the format is #{fmt}"
       @result = instance_eval(fmt)
     end
   end
