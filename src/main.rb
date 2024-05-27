@@ -34,6 +34,7 @@ new_history = File.read(history_file).split("\n")
 loop do
   begin
     user_input = Editor.new(prompt, new_history).repl
+    next if user_input.empty?
     new_history << user_input if user_input != nil
     break if user_input.nil? || user_input == 'exit'
     out.get_input(user_input)
@@ -49,6 +50,6 @@ loop do
   end
 end
 
-tmp = File.open(history_file, File::APPEND | File::WRONLY) do |fd|
+tmp = File.open(history_file, File::TRUNC | File::WRONLY) do |fd|
   fd.write(new_history.map {|s| s + "\n"}.inject("", &:+))
 end

@@ -22,8 +22,8 @@ def to_integer(string)
 end
 
 def strlit?(str)
-    if (str[0] == '"') and (str[str.length() - 1] == '"') then
-      return true
+  if (str[0] == '"') and (str[str.length() - 1] == '"') then
+    return true
   end
   false
 end
@@ -60,8 +60,8 @@ $special = ['(', ')', '{', '}',
             'next', 'nil', 'redo', 'retry',
             'return', 'self', 'super', 'then',
             'undef', 'when', 'yield', 'ENCODING',
-            'LINE', 'FILE', '#', '.',
-            ';']
+            'LINE', 'FILE', '#', '.', ',',
+            ';', '[', ']']
 
 # pipe implementation
 def pipe(input, *proc2)
@@ -110,16 +110,13 @@ class ProgramOutput
   def output = @out
 end
 
-def lapis_call_ext(pname, *pargs)
+def lapis_call_ext(pname, pargs)
   s = ''
   raise "Unknown Executable #{pname}" unless in_path?(pname)
-  
-  argstr = pargs[0].inject('') { |a, c| "#{a} #{c}" }
-  exect = pname.to_s + argstr
-  IO.popen(exect, err: %i[child out]) { |ex| s += ex.read }
+  pargs.unshift(pname.to_s)
+  IO.popen(pargs, :err=>[:child, :out]) { |ex| s += ex.read }
   ProgramOutput.new(s)
 end
-
 
 class Tokens
   def initialize(str)
@@ -130,19 +127,16 @@ class Tokens
     @str.chars.each_with_index do |c, i|
       if c == "-"
         tmp += "-"
-      elsif c == " " and !in_str then
+      elsif c == " " and (!in_str) then
         @tks << tmp unless tmp.empty?
         @tks << " "
         tmp = ""
-      elsif c == "/" and (!in_str) and (@str[i-1] == @str[i+1] &&
-                                        @str[i-1] == ' ') then
+      elsif $special.include?(@str[i]) and (!in_str) and
+            ((i == (@str.length - 1)) or (i == 0) or
+             ((@str[i+1] == ' ') || (@str[i-1] == ' '))) then
         @tks << tmp unless tmp.empty?
         @tks << c
-        tmp = ''
-      elsif $special.include?(c) and (!in_str) then
-        @tks << tmp unless tmp.empty?
-        @tks << c
-        tmp = ''
+        tmp = ""
       elsif c == '"'
         begin
           @tks << tmp
@@ -198,10 +192,18 @@ class Format
         if in_command then
           if past_first_arg then
             new_tks << ","
-            new_tks << x
+            if @vars.has_key? x then new_tks << "@vars[\"#{x}\"]"
+            elsif (to_integer(x) != nil) or strlit? x then new_tks << x
+            elsif (x == "true") or (x == "false") then new_tks << x
+            else new_tks << "\"#{x}\""
+            end
           else
-            past_first_arg = true if in_command
-            new_tks << x
+            past_first_arg = true
+            if @vars.has_key? x then new_tks << "@vars[\"#{x}\"]"
+            elsif (to_integer(x) != nil) or strlit? x then new_tks << x
+            elsif (x == "true") or (x == "false") then new_tks << x
+            else new_tks << "\"#{x}\""
+            end
           end
         else new_tks << x
         end
@@ -216,9 +218,7 @@ class Format
   def reconcat()
     return "" if @tks.size == 0
     @tks[-1] = @tks[-1][0..-2] if @tks[-1][-1] == ','
-    @result = @tks
-                .map {|s| if @vars.has_key?(s) then "@vars[\"#{s}\"]" else s end }
-                .inject('', &:+)
+    @result = @tks.inject('', &:+)
   end
   def get = @result
 end
@@ -269,6 +269,7 @@ class ProgramEnv
     else
       tks = Tokens.new(@str).get
       fmt = Format.new(tks, @vars).get
+      puts "the format is #{fmt}"
       @result = instance_eval(fmt)
     end
   end

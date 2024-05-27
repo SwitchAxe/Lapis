@@ -51,8 +51,8 @@ class Colorize
   def initialize(input)
     @tks = Tokens.new(input).get
     @result = @tks.map do |tk|
-      if $special.include? tk then
-        $ttypastel.cyan(tk)
+      if in_path?(tk) or method?(tk) then
+        $ttypastel.magenta(tk)
       elsif to_integer(tk) != nil then
         $ttypastel.yellow(tk)
       elsif strlit?(tk) then
@@ -129,11 +129,15 @@ class Editor
     @key = Keypress.new
     @ttyreader.on(:keybackspace) do
       pos = @key.getp
-      @input.slice!(pos - 1)
-      print $ttycursor.backward(1)
-      print $ttycursor.clear_line
-      print @user_prompt + Colorize.new(@input).get
-      STDOUT.flush
+      begin
+        @input.slice!(pos - 1)
+        print $ttycursor.save
+        print $ttycursor.clear_line
+        print @user_prompt + Colorize.new(@input).get
+        print $ttycursor.restore
+        print $ttycursor.backward(1)
+        STDOUT.flush
+      end if pos > 0
     end
     @ttyreader.on(:keytab) do
       @prompt.show(Selection.new(@last_word).choices)
@@ -173,13 +177,17 @@ class Editor
         STDOUT.flush
       else
         @input_bak = @input if @history_index == 0
-        @input = @history[@history_index]
+        @input = @history[@history.length - @history_index - 1]
         @history_index += 1
         print $ttycursor.save
         print $ttycursor.clear_line
         print $ttycursor.column(0)
         print @user_prompt + Colorize.new(@input).get
+        print $ttycursor.down(1)
+        print $ttycursor.column(0)
+        print $ttypastel.green "History entry ##{@history_index}"
         print $ttycursor.restore
+        @key.resize_limit(@input.length)
         STDOUT.flush
       end
     end
@@ -199,8 +207,18 @@ class Editor
         @input = @input_bak
       else
         @history_index -= 1
-        @input = @history[@history_index]
+        @input = @history[@history.length - @history_index - 1]
       end
+      print $ttycursor.save
+      print $ttycursor.clear_line
+      print $ttycursor.column(0)
+      print @user_prompt + Colorize.new(@input).get
+      print $ttycursor.down(1)
+      print $ttycursor.column(0)
+      print $ttypastel.green "History entry ##{@history_index}"
+      print $ttycursor.restore
+      @key.resize_limit(@input.length)
+      STDOUT.flush
     end
     
     @ttyreader.on(:keyreturn, :keyenter) do
