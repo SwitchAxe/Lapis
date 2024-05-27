@@ -31,6 +31,30 @@ end
 prompt
 ```
 
+## Custom procedures
+By default, Lapis is very minimal in what you can do with it, but since Lapis code is just
+Ruby code with extra steps, you can actually use Ruby to customize Lapis and, in particular,
+make custom functions. Lapis doesn't have a "cd" builtin, but we can quickly make a usual, and even better,
+version:
+```ruby
+# the block is optional. If the block is given, cd will only affect the block.
+# otherwise, it will change the directory globally and persistently, just like
+# the bash 'cd' command.
+# the block, if present, must accept NO arguments.
+def cd(str)
+  if block_given? then
+    result = ""
+    Dir.chdir(str) { result = yield }
+    return result
+  end
+  Dir.chdir(str)
+  nil
+end
+```  
+
+Lapis will check for additional procedures like the one above only once per-session, so you can't
+hot-reload them. These procedures will go in a `procedures.rb` file in `~/.config/lapis`.
+
 ## How to run the shell
 provided you have the dependencies (the latest ruby version and bundler) you can run
 the shell in two ways:
