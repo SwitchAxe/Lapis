@@ -90,7 +90,7 @@ class ProgramOutput
     unless @out.respond_to?(method_name)
       ret = ProgramOutput.new(pipe(@out, method_name.to_s,
                                    *args.map(&:to_s)))
-      maybe_blr = block&.call(ret)
+      maybe_blr = block&.call(ret.output)
       # if maybe_blr (blr == block return) is nil, return ret.
       # otherwise, return maybe_blr.
       return maybe_blr if maybe_blr
@@ -114,6 +114,7 @@ def lapis_call_ext(pname, pargs)
   s = ''
   raise "Unknown Executable #{pname}" unless in_path?(pname)
   pargs.unshift(pname.to_s)
+  pargs = pargs.map {|x| x.to_s}
   IO.popen(pargs, :err=>[:child, :out]) { |ex| s += ex.read }
   ProgramOutput.new(s)
 end
@@ -124,14 +125,26 @@ class Tokens
     @tks = []
     tmp = ''
     in_str = false
+    in_pipes = false
     @str.chars.each_with_index do |c, i|
       if c == "-"
         tmp += "-"
-      elsif c == " " and (!in_str) then
+      elsif c == " " and (!in_str) and (!in_pipes) then
         @tks << tmp unless tmp.empty?
         @tks << " "
         tmp = ""
-      elsif $special.include?(@str[i]) and (!in_str) and
+      elsif c == "|" then
+        begin
+          @tks << tmp
+          tmp = ""
+        end unless tmp.empty? or tmp[0] == "|"
+        tmp += '|'
+        in_pipes = !in_pipes
+        begin
+          @tks << tmp
+          tmp = ''
+        end if in_pipes == false
+      elsif $special.include?(@str[i]) and (!in_str) and (!in_pipes) and
             ((i == (@str.length - 1)) or (i == 0) or
              ((@str[i+1] == ' ') || (@str[i-1] == ' '))) then
         @tks << tmp unless tmp.empty?
@@ -170,9 +183,26 @@ class Format
   def rewrite()
     past_first_arg = false
     in_command = false
+    must_insert_command = false
     new_tks = []
+    in_block = false
     @tks.each_with_index do |x, i|
       if (x == ' ') then new_tks << x
+      elsif (x == '{') || (x == 'do') then
+        in_block = true
+        new_tks << ")" if in_command
+        new_tks << x
+      elsif in_block then
+        in_block = false
+        if x[0] == '|' then
+          must_insert_command = true
+          new_tks << x
+        else
+          in_command = true
+          past_first_arg = false
+          new_tks << x
+          new_tks << "("
+        end
       elsif i == 0 then
         if in_path?(x) or method?(x) then
           in_command = true
@@ -180,6 +210,17 @@ class Format
           new_tks << "("
         else new_tks << x
         end
+      elsif must_insert_command then
+        new_tks << x
+        new_tks << "("
+        in_command = true
+        past_first_arg = false
+        must_insert_command = false
+      elsif (x == ".") and in_command then
+        new_tks << ")"
+        new_tks << "."
+        past_first_arg = false
+        must_insert_command = true
       elsif $special.include? x then
         if in_command then
           new_tks << ")"

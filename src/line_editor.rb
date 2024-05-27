@@ -13,7 +13,6 @@ class Prompt
   def initialize()
     @prompt = TTY::Prompt.new
     @result = ""
-    @prompt.on(:keytab) {|_k| @prompt.trigger(:keydown) }
   end
 
   def show(options)
@@ -37,11 +36,8 @@ class Selection
   end
 
   def choices
-    result = ProgramEnv.new("ls -1")
-    result.lapis_eval()
-    result = result.result.output
-    xs = result.split("\n")
-    @options = xs.select {|x| @rx.match? x}
+    result = Dir.glob("**/*", File::FNM_DOTMATCH)
+    @options = result.select {|x| @rx.match? x}
     return @options
   end
 end
@@ -137,6 +133,12 @@ class Editor
         print $ttycursor.restore
         print $ttycursor.backward(1)
         STDOUT.flush
+        if @input == "" then @last_word = ""
+        elsif @input[-1] == ' ' then @last_word = ""
+        else @last_word = @input[0..pos].split.last
+        end
+        if @last_word[0] == '"' then @last_word = @last_word[1, -1] end
+        if @last_word == nil then @last_word = "" end
       end if pos > 0
     end
     @ttyreader.on(:keytab) do
@@ -224,6 +226,7 @@ class Editor
     @ttyreader.on(:keyreturn, :keyenter) do
       print $ttycursor.down(1)
       print $ttycursor.column(0)
+      print $ttycursor.clear_line
       STDOUT.flush
       @must_return = true
       @history_index = 0
