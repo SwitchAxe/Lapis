@@ -39,6 +39,7 @@ loop do
     break if user_input.nil? || user_input == 'exit'
     out.get_input(user_input)
     out.lapis_eval
+    if out.result == nil then next end
     if out.result.is_a? ProgramOutput
       puts out.result.output
     else

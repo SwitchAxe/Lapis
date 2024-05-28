@@ -198,10 +198,16 @@ class Format
           must_insert_command = true
           new_tks << x
         else
-          in_command = true
-          past_first_arg = false
-          new_tks << x
-          new_tks << "("
+          if in_path?(x) or method?(x) then
+            in_command = true
+            past_first_arg = false
+            new_tks << x
+            new_tks << "("
+          else
+            new_tks << x
+            in_command = false
+            must_insert_command = false
+          end
         end
       elsif i == 0 then
         if in_path?(x) or method?(x) then
@@ -211,11 +217,17 @@ class Format
         else new_tks << x
         end
       elsif must_insert_command then
-        new_tks << x
-        new_tks << "("
-        in_command = true
-        past_first_arg = false
-        must_insert_command = false
+        if in_path?(x) or method?(x) then
+          new_tks << x
+          new_tks << "("
+          in_command = true
+          past_first_arg = false
+          must_insert_command = false
+        else
+          new_tks << x
+          must_insert_command = false
+          in_command = false
+        end
       elsif (x == ".") and in_command then
         new_tks << ")"
         new_tks << "."
